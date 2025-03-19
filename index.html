@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Онлайн Метроном</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 30px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .title {
+            font-size: 32px;
+            color: #2196F3;
+            margin-bottom: 15px;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(33, 150, 243, 0.2);
+        }
+
+        .description {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.5;
+            max-width: 400px;
+            margin: 0 auto 25px;
+        }
+
+        .highlight {
+            color: #2196F3;
+            font-weight: 500;
+        }
+
+        .bpm-control {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .bpm-display {
+            font-size: 72px;
+            font-weight: bold;
+            color: #2196F3;
+            margin: 20px 0;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 10px;
+            -webkit-appearance: none;
+            background: #ddd;
+            border-radius: 5px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 25px;
+            height: 25px;
+            background: #2196F3;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        button {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .start-btn {
+            background: #2196F3;
+            color: white;
+        }
+
+        .stop-btn {
+            background: #f44336;
+            color: white;
+            display: none;
+        }
+
+        .time-signature {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .time-btn {
+            width: 60px;
+            height: 60px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            cursor: pointer;
+            background: white;
+            transition: 0.3s;
+        }
+
+        .time-btn.active {
+            border-color: #2196F3;
+            color: #2196F3;
+            background: #e3f2fd;
+        }
+
+        .beat-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 30px 0;
+        }
+
+        .beat-dot {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #ddd;
+            transition: 0.1s;
+        }
+
+        .beat-dot.active {
+            background: #2196F3;
+            transform: scale(1.2);
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+            }
+
+            .title {
+                font-size: 28px;
+            }
+
+            .description {
+                font-size: 14px;
+            }
+
+            .bpm-display {
+                font-size: 56px;
+            }
+
+            button {
+                padding: 10px 25px;
+                font-size: 16px;
+            }
+
+            .time-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+
+            .beat-dot {
+                width: 25px;
+                height: 25px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">Онлайн Метроном школы "Струны Будущего"</h1>
+            <p class="description">
+                Просто установите <span class="highlight">BPM</span> (кол-во ударов в минуту) и размер "4/4".
+            </p>
+        </div>
+
+        <div class="bpm-control">
+            <div class="bpm-display">120</div>
+            <input type="range" id="bpm" min="40" max="208" value="120">
+        </div>
+
+        <div class="time-signature">
+            <div class="time-btn active" data-time="4">4/4</div>
+            <div class="time-btn" data-time="3">3/4</div>
+            <div class="time-btn" data-time="2">2/4</div>
+        </div>
+
+        <div class="beat-indicator">
+            <div class="beat-dot"></div>
+            <div class="beat-dot"></div>
+            <div class="beat-dot"></div>
+            <div class="beat-dot"></div>
+        </div>
+
+        <div class="controls">
+            <button class="start-btn">Старт</button>
+            <button class="stop-btn">Стоп</button>
+        </div>
+    </div>
+
+    <script>
+        let isPlaying = false;
+        let timerId = null;
+        let audioContext;
+        let currentBeat = 0;
+        let beatsPerMeasure = 4;
+
+        // Инициализация аудио
+        function initAudio() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        // Точная имитация звука metronome-online.com
+        function playSound(isAccent) {
+            if (!audioContext) return;
+
+            const now = audioContext.currentTime;
+            
+            // Основной тон
+            const osc1 = audioContext.createOscillator();
+            osc1.type = 'square';
+            osc1.frequency.setValueAtTime(isAccent ? 1200 : 800, now);
+
+            // Фильтр для формирования тембра
+            const filter = audioContext.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(2000, now);
+            filter.Q.setValueAtTime(1, now);
+
+            // Огибающая
+            const gainNode = audioContext.createGain();
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(isAccent ? 0.6 : 0.4, now + 0.001);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+            // Создаем цепь обработки
+            osc1.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            // Запуск и остановка
+            osc1.start(now);
+            osc1.stop(now + 0.08);
+
+            // Добавляем щелчок для атаки
+            if(isAccent) {
+                const clickOsc = audioContext.createOscillator();
+                clickOsc.type = 'square';
+                clickOsc.frequency.setValueAtTime(150, now);
+                
+                const clickGain = audioContext.createGain();
+                clickGain.gain.setValueAtTime(0.3, now);
+                clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+                
+                clickOsc.connect(clickGain);
+                clickGain.connect(audioContext.destination);
+                clickOsc.start(now);
+                clickOsc.stop(now + 0.02);
+            }
+        }
+
+        // Обновление индикатора долей
+        function updateBeatIndicator() {
+            const dots = document.querySelectorAll('.beat-dot');
+            dots.forEach((dot, index) => {
+                dot.classList.toggle('active', index === currentBeat);
+            });
+        }
+
+        // Основной цикл метронома
+        function metronomeLoop() {
+            if (!isPlaying) return;
+
+            const bpm = parseInt(document.getElementById('bpm').value);
+            const interval = 60000 / bpm;
+
+            playSound(currentBeat === 0);
+            updateBeatIndicator();
+
+            currentBeat = (currentBeat + 1) % beatsPerMeasure;
+            
+            timerId = setTimeout(metronomeLoop, interval);
+        }
+
+        // Обработчики событий
+        document.querySelector('.start-btn').addEventListener('click', () => {
+            if (!audioContext) initAudio();
+            
+            isPlaying = true;
+            document.querySelector('.start-btn').style.display = 'none';
+            document.querySelector('.stop-btn').style.display = 'inline-block';
+            metronomeLoop();
+        });
+
+        document.querySelector('.stop-btn').addEventListener('click', () => {
+            isPlaying = false;
+            clearTimeout(timerId);
+            document.querySelector('.start-btn').style.display = 'inline-block';
+            document.querySelector('.stop-btn').style.display = 'none';
+            currentBeat = 0;
+            updateBeatIndicator();
+        });
+
+        document.getElementById('bpm').addEventListener('input', (e) => {
+            document.querySelector('.bpm-display').textContent = e.target.value;
+        });
+
+        document.querySelectorAll('.time-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                beatsPerMeasure = parseInt(btn.dataset.time);
+                
+                // Обновление индикатора долей
+                const beatContainer = document.querySelector('.beat-indicator');
+                beatContainer.innerHTML = Array.from({length: beatsPerMeasure}, () => 
+                    '<div class="beat-dot"></div>'
+                ).join('');
+            });
+        });
+
+        // Инициализация при первом клике
+        document.body.addEventListener('click', () => {
+            if (!audioContext) {
+                initAudio();
+            }
+        }, {once: true});
+    </script>
+</body>
